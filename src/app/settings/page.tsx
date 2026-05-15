@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getSettings, saveSettings, resetMonth, updateTheme } from "@/actions/settings";
+import { logout } from "@/actions/auth";
 import { getMonthExpenses } from "@/actions/expenses";
 import { exportToExcel } from "@/lib/export";
 import { toast } from "sonner";
@@ -108,7 +109,10 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      await Promise.all([
+        signOut(auth),
+        logout()
+      ]);
       router.push("/login");
     } catch {
       toast.error("Sign out failed");
