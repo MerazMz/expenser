@@ -9,13 +9,14 @@ import { Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SpendInputProps {
+  userId: string;
   initialSpent?: number;
   initialNote?: string;
 }
 
 import { motion, AnimatePresence } from "framer-motion";
 
-export function SpendInput({ initialSpent = 0, initialNote = "" }: SpendInputProps) {
+export function SpendInput({ userId, initialSpent = 0, initialNote = "" }: SpendInputProps) {
   const [spent, setSpent] = useState(initialSpent > 0 ? initialSpent.toString() : "");
   const [note, setNote] = useState(initialNote);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +31,7 @@ export function SpendInput({ initialSpent = 0, initialNote = "" }: SpendInputPro
 
     setIsLoading(true);
     try {
-      await saveTodayExpense(Number(spent), note);
+      await saveTodayExpense(userId, Number(spent), note);
       setIsSaved(true);
       toast.success("Expense saved!");
       setTimeout(() => {
@@ -58,7 +59,7 @@ export function SpendInput({ initialSpent = 0, initialNote = "" }: SpendInputPro
           <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
             <Check className="h-6 w-6 text-primary" />
           </div>
-          <p className="text-sm font-medium text-foreground mb-1">YOU'RE CAUGHT UP FOR TODAY</p>
+          <p className="text-sm font-medium text-foreground mb-1">YOU&apos;RE CAUGHT UP FOR TODAY</p>
           <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest opacity-40">
             TAP TO EDIT ENTRY
           </p>

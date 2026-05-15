@@ -1,7 +1,6 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 
 interface TodayCardProps {
   expense: {
@@ -15,7 +14,8 @@ interface TodayCardProps {
 import { motion } from "framer-motion";
 
 export function TodayCard({ expense }: TodayCardProps) {
-  const percentageSaved = Math.max(0, Math.min(100, Math.round((expense.saved / expense.limit) * 100)));
+  const displaySaved = expense.limit - expense.spent;
+  const percentageSaved = Math.max(0, Math.min(100, Math.round((displaySaved / expense.limit) * 100)));
   
   return (
     <motion.div
@@ -36,7 +36,7 @@ export function TodayCard({ expense }: TodayCardProps) {
               </div>
               <div className="space-y-1 text-right">
                 <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground opacity-60">
-                  Today's Spent
+                  Today&apos;s Spent
                 </p>
                 <p className="text-xl font-medium italic text-foreground font-mono">₹{expense.spent}</p>
               </div>
@@ -48,7 +48,7 @@ export function TodayCard({ expense }: TodayCardProps) {
                 <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground opacity-60">
                   You Saved
                 </p>
-                <p className="text-3xl font-medium italic text-primary font-mono">₹{expense.saved}</p>
+                <p className="text-3xl font-medium italic text-primary font-mono">₹{displaySaved}</p>
               </div>
               <div className="relative h-14 w-14 flex-shrink-0">
                 <svg className="h-full w-full" viewBox="0 0 36 36">

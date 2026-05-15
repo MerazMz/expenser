@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 
 interface SavingsChartProps {
   data: {
@@ -73,14 +72,14 @@ export function SavingsChart({ data }: SavingsChartProps) {
               y2={line.y}
               stroke="currentColor"
               strokeWidth="0.5"
-              className="text-foreground opacity-5"
+              className="text-foreground opacity-10"
               strokeDasharray="2 2"
             />
             <text
               x={padding - 10}
               y={line.y + 3}
               textAnchor="end"
-              className="text-[8px] fill-muted-foreground opacity-40 font-mono"
+              className="text-[8px] fill-foreground/70 font-mono"
             >
               {line.label}
             </text>
@@ -94,7 +93,7 @@ export function SavingsChart({ data }: SavingsChartProps) {
             x={label.x}
             y={chartHeight - 5}
             textAnchor="middle"
-            className="text-[8px] fill-muted-foreground opacity-40 font-mono"
+            className="text-[8px] fill-foreground/70 font-mono"
           >
             {label.label}
           </text>

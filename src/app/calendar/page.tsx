@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   format, 
   startOfMonth, 
@@ -10,12 +10,12 @@ import {
   getDay, 
   addMonths, 
   subMonths,
-  isSameDay
+  isSameDay,
 } from "date-fns";
 import { PageWrapper } from "@/components/layout/page-wrapper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Menu, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { getMonthExpenses, saveExpense, getMonthlySummary } from "@/actions/expenses";
 import { getSettings } from "@/actions/settings";
 import { MonthlySummary } from "@/components/dashboard/monthly-summary";
@@ -24,15 +24,22 @@ import { IExpense, ISettings } from "@/types";
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
-  SheetTitle,
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
+import { useAuth } from "@/components/providers/auth-provider";
+
+interface CalendarSummary {
+  totalSpent: number;
+  totalSaved: number;
+  totalLimit: number;
+  totalLimitTillNow: number;
+}
 
 export default function CalendarPage() {
+  const { user, loading: authLoading } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [expenses, setExpenses] = useState<IExpense[]>([]);
-  const [summary, setSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<CalendarSummary | null>(null);
   const [settings, setSettings] = useState<ISettings | null>(null);
   const [selectedDay, setSelectedDay] = useState<IExpense | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -42,20 +49,21 @@ export default function CalendarPage() {
 
   const monthStr = format(currentDate, "yyyy-MM");
   
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    if (!user) return;
     const [expensesData, summaryData, settingsData] = await Promise.all([
-      getMonthExpenses(monthStr),
-      getMonthlySummary(monthStr),
-      getSettings()
+      getMonthExpenses(user.uid, monthStr),
+      getMonthlySummary(user.uid, monthStr),
+      getSettings(user.uid)
     ]);
     setExpenses(expensesData);
     setSummary(summaryData);
     setSettings(settingsData);
-  };
+  }, [user, monthStr]);
 
   useEffect(() => {
     loadData();
-  }, [monthStr]);
+  }, [loadData]);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -73,17 +81,18 @@ export default function CalendarPage() {
     const expense = expenses.find(e => e.date === dateStr);
     if (expense) {
       setSelectedDay(expense);
-      setEditSpent(expense.spent.toString());
+      const hasData = expense.spent > 0 || (expense.note && expense.note.trim() !== "");
+      setEditSpent(hasData ? expense.spent.toString() : "");
       setEditNote(expense.note || "");
       setIsSheetOpen(true);
     }
   };
 
   const handleSave = async () => {
-    if (!selectedDay) return;
+    if (!selectedDay || !user) return;
     setIsSaving(true);
     try {
-      await saveExpense(selectedDay.date, Number(editSpent), editNote);
+      await saveExpense(user.uid, selectedDay.date, Number(editSpent), editNote);
       toast.success("Updated successfully");
       setIsSheetOpen(false);
       loadData();
@@ -93,6 +102,14 @@ export default function CalendarPage() {
       setIsSaving(false);
     }
   };
+
+  if (authLoading || !summary || !settings) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <PageWrapper className="flex flex-col min-h-screen bg-background px-6 pt-4 pb-24">

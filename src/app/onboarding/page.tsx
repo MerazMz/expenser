@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { saveSettings } from "@/actions/settings";
 import { toast } from "sonner";
 import { Loader2, ArrowRight, Check } from "lucide-react";
+import { useAuth } from "@/components/providers/auth-provider";
+import { format } from "date-fns";
 
 export default function OnboardingPage() {
+  const { user, loading: authLoading } = useAuth();
   const [step, setStep] = useState(1);
   const [monthlyBudget, setMonthlyBudget] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
 
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const dailyBudget = monthlyBudget ? Math.round(Number(monthlyBudget) / daysInMonth) : 0;
@@ -28,9 +37,10 @@ export default function OnboardingPage() {
   };
 
   const handleFinish = async () => {
+    if (!user) return;
     setIsLoading(true);
     try {
-      await saveSettings({
+      await saveSettings(user.uid, {
         monthlyBudget: Number(monthlyBudget),
       });
       toast.success("Setup complete!");
@@ -42,8 +52,16 @@ export default function OnboardingPage() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
+    <div className="flex min-h-screen items-center justify-center p-6 bg-background">
       <AnimatePresence mode="wait">
         {step === 1 ? (
           <motion.div
@@ -54,8 +72,8 @@ export default function OnboardingPage() {
             className="w-full max-w-md space-y-8 text-center"
           >
             <div className="space-y-2">
-              <h1 className="text-4xl font-bold italic text-primary">EXPENSER</h1>
-              <p className="text-muted-foreground">Let&apos;s set up your monthly budget.</p>
+              <h1 className="text-4xl font-bold italic lowercase text-primary">EXPENSER</h1>
+              <p className="text-muted-foreground">Let&apos;s set up your {format(new Date(), "MMMM")} month budget.</p>
             </div>
 
             <Card className="border-none bg-card/50">

@@ -31,8 +31,8 @@ const navItems = [
 export function BottomNav() {
   const pathname = usePathname();
 
-  // Don't show nav on onboarding
-  if (pathname === "/onboarding" || pathname === "/") return null;
+  // Don't show nav on onboarding or login
+  if (pathname === "/onboarding" || pathname === "/login" || pathname === "/") return null;
 
   return (
     <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-6">

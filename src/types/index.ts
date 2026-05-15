@@ -1,5 +1,6 @@
 export interface ISettings {
   _id?: string;
+  userId: string;
   monthlyBudget: number;
   dailyBudget: number;
   currency: string;
@@ -11,6 +12,7 @@ export interface ISettings {
 
 export interface IExpense {
   _id?: string;
+  userId: string;
   date: string;
   limit: number;
   spent: number;

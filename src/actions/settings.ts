@@ -5,29 +5,31 @@ import Settings from "@/models/Settings";
 import Expense from "@/models/Expense";
 import { revalidatePath } from "next/cache";
 
-export async function getSettings() {
+export async function getSettings(userId: string) {
+  if (!userId) return null;
   await dbConnect();
-  const settings = await Settings.findOne().lean();
-  return JSON.parse(JSON.stringify(settings));
+  const settings = await Settings.findOne({ userId }).lean();
+  return settings ? JSON.parse(JSON.stringify(settings)) : null;
 }
 
-export async function saveSettings(data: {
+export async function saveSettings(userId: string, data: {
   monthlyBudget: number;
   currency?: string;
   theme?: string;
 }) {
+  if (!userId) throw new Error("Unauthorized");
   await dbConnect();
 
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   
-  // Calculate days in current month
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const dailyBudget = Math.round(data.monthlyBudget / daysInMonth);
 
   const updatedSettings = await Settings.findOneAndUpdate(
-    {},
+    { userId },
     {
+      userId,
       ...data,
       dailyBudget,
       currentMonth,
@@ -37,14 +39,13 @@ export async function saveSettings(data: {
     { upsert: true, new: true }
   );
 
-  // Generate month entries if they don't exist
-  await generateMonthEntries(currentMonth, dailyBudget);
+  await generateMonthEntries(userId, currentMonth, dailyBudget);
 
   revalidatePath("/");
   return JSON.parse(JSON.stringify(updatedSettings));
 }
 
-export async function generateMonthEntries(monthStr: string, dailyBudget: number) {
+export async function generateMonthEntries(userId: string, monthStr: string, dailyBudget: number) {
   await dbConnect();
   
   const [year, month] = monthStr.split('-').map(Number);
@@ -54,21 +55,22 @@ export async function generateMonthEntries(monthStr: string, dailyBudget: number
   for (let day = 1; day <= daysInMonth; day++) {
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     entries.push({
+      userId,
       date,
       limit: dailyBudget,
       spent: 0,
-      saved: dailyBudget,
+      saved: 0,
       note: ''
     });
   }
 
-  // Use bulkWrite for efficiency with aggregation pipeline to update limit and recalculate saved
   const operations = entries.map(entry => ({
     updateOne: {
-      filter: { date: entry.date },
+      filter: { userId, date: entry.date },
       update: [
         { 
           $set: { 
+            userId,
             limit: dailyBudget,
             spent: { $ifNull: ["$spent", 0] },
             note: { $ifNull: ["$note", ""] }
@@ -76,7 +78,18 @@ export async function generateMonthEntries(monthStr: string, dailyBudget: number
         },
         { 
           $set: { 
-            saved: { $subtract: ["$limit", "$spent"] } 
+            saved: { 
+              $cond: {
+                if: { 
+                  $and: [
+                    { $eq: ["$spent", 0] },
+                    { $eq: ["$note", ""] }
+                  ] 
+                },
+                then: 0,
+                else: { $subtract: ["$limit", "$spent"] }
+              }
+            } 
           } 
         }
       ],
@@ -87,15 +100,17 @@ export async function generateMonthEntries(monthStr: string, dailyBudget: number
   await Expense.bulkWrite(operations);
 }
 
-export async function updateTheme(theme: string) {
+export async function updateTheme(userId: string, theme: string) {
+  if (!userId) return;
   await dbConnect();
-  await Settings.findOneAndUpdate({}, { theme });
+  await Settings.findOneAndUpdate({ userId }, { theme }, { upsert: true });
   revalidatePath("/");
 }
 
-export async function resetMonth() {
+export async function resetMonth(userId: string) {
+  if (!userId) return;
   await dbConnect();
-  const settings = await Settings.findOne();
+  const settings = await Settings.findOne({ userId });
   if (!settings) return;
 
   const now = new Date();
@@ -106,24 +121,22 @@ export async function resetMonth() {
   const daysInMonth = new Date(year, month, 0).getDate();
   const dailyBudget = Math.round(settings.monthlyBudget / daysInMonth);
 
-  // Update settings
-  await Settings.findOneAndUpdate({}, { dailyBudget, currentMonth });
+  await Settings.findOneAndUpdate({ userId }, { dailyBudget, currentMonth });
 
-  // Clear all entries for this month
   const entries = [];
   for (let day = 1; day <= daysInMonth; day++) {
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     entries.push({
+      userId,
       date,
       limit: dailyBudget,
       spent: 0,
-      saved: dailyBudget,
+      saved: 0,
       note: ''
     });
   }
 
-  // Clear and regenerate
-  await Expense.deleteMany({ date: { $regex: `^${currentMonth}` } });
+  await Expense.deleteMany({ userId, date: { $regex: `^${currentMonth}` } });
   await Expense.insertMany(entries);
   
   revalidatePath("/");

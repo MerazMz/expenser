@@ -1,43 +1,89 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { getSettings } from "@/actions/settings";
 import { getMonthExpenses } from "@/actions/expenses";
 import { PageWrapper } from "@/components/layout/page-wrapper";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Target, Zap, LucideIcon } from "lucide-react";
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from "date-fns";
+import { TrendingUp, TrendingDown, Target, Zap, LucideIcon, Loader2 } from "lucide-react";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { IExpense } from "@/types";
-
 import { SavingsChart } from "@/components/insights/savings-chart";
+import { useAuth } from "@/components/providers/auth-provider";
+import { useRouter } from "next/navigation";
 
-export default async function InsightsPage() {
-  const settings = await getSettings();
-  if (!settings) return null;
+interface InsightsData {
+  averageSpend: number;
+  projectedSpent: number;
+  isProjectedOver: boolean;
+  bestDay: IExpense | null;
+  worstDay: IExpense | null;
+  savingsData: { date: string; saved: number }[];
+}
 
-  const now = new Date();
-  const currentMonth = format(now, "yyyy-MM");
-  const expenses: IExpense[] = await getMonthExpenses(currentMonth);
+export default function InsightsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [data, setData] = useState<InsightsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  const todayStr = format(now, "yyyy-MM-dd");
-  const pastExpenses = expenses.filter(e => e.date < todayStr);
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+      return;
+    }
 
-  const totalSpent = expenses.reduce((acc, e) => acc + e.spent, 0);
-  const daysInMonth = expenses.length;
-  const currentDayOfMonth = now.getDate();
-  const averageSpend = Math.round(totalSpent / currentDayOfMonth);
-  
-  const projectedSpent = averageSpend * daysInMonth;
-  const isProjectedOver = projectedSpent > settings.monthlyBudget;
+    if (user) {
+      const loadData = async () => {
+        const now = new Date();
+        const currentMonth = format(now, "yyyy-MM");
+        const [settings, expenses] = await Promise.all([
+          getSettings(user.uid),
+          getMonthExpenses(user.uid, currentMonth)
+        ]);
 
-  const bestDay = [...pastExpenses].sort((a, b) => b.saved - a.saved)[0];
-  const worstDay = [...pastExpenses].sort((a, b) => a.saved - b.saved)[0];
+        if (!settings) {
+          router.push("/onboarding");
+          return;
+        }
 
-  // Savings Trend Data (Only up to yesterday)
-  const savingsData = expenses
-    .filter(e => e.date < todayStr)
-    .map(e => ({
-      date: e.date,
-      saved: e.saved
-    }));
+        const todayStr = format(now, "yyyy-MM-dd");
+        const pastExpenses = expenses.filter((e: IExpense) => e.date < todayStr);
+        const totalSpent = expenses.reduce((acc: number, e: IExpense) => acc + e.spent, 0);
+        const daysInMonth = expenses.length;
+        const currentDayOfMonth = now.getDate();
+        const averageSpend = Math.round(totalSpent / currentDayOfMonth);
+        const projectedSpent = averageSpend * daysInMonth;
+        const isProjectedOver = projectedSpent > settings.monthlyBudget;
+        const bestDay = [...pastExpenses].sort((a, b) => b.saved - a.saved)[0];
+        const worstDay = [...pastExpenses].sort((a, b) => a.saved - b.saved)[0];
+        const savingsData = expenses.filter((e: IExpense) => e.date < todayStr).map((e: IExpense) => ({
+          date: e.date,
+          saved: e.saved
+        }));
+
+        setData({
+          averageSpend,
+          projectedSpent,
+          isProjectedOver,
+          bestDay,
+          worstDay,
+          savingsData
+        });
+        setLoading(false);
+      };
+      loadData();
+    }
+  }, [user, authLoading, router]);
+
+  if (authLoading || loading || !data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <PageWrapper className="flex flex-col space-y-8 p-6 bg-background min-h-screen">
@@ -51,33 +97,33 @@ export default async function InsightsPage() {
       <div className="grid grid-cols-2 gap-4">
         <InsightCard 
           label="Avg. Spend/Day" 
-          value={`₹${averageSpend}`} 
+          value={`₹${data.averageSpend}`} 
           icon={Zap} 
           description="Based on this month"
         />
         <InsightCard 
           label="Projected End" 
-          value={`₹${projectedSpent}`} 
+          value={`₹${data.projectedSpent}`} 
           icon={Target} 
-          description={isProjectedOver ? "Over budget" : "Within budget"}
-          status={isProjectedOver ? "danger" : "success"}
+          description={data.isProjectedOver ? "Over budget" : "Within budget"}
+          status={data.isProjectedOver ? "danger" : "success"}
         />
-        {bestDay && (
+        {data.bestDay && (
           <InsightCard 
             label="Best Day" 
-            value={`₹${bestDay.saved}`} 
+            value={`₹${data.bestDay.saved}`} 
             icon={TrendingUp} 
-            description={format(new Date(bestDay.date), "dd MMM")}
+            description={format(new Date(data.bestDay.date), "dd MMM")}
             status="success"
           />
         )}
-        {worstDay && (
+        {data.worstDay && (
           <InsightCard 
             label="Worst Day" 
-            value={`₹${Math.abs(worstDay.saved)}`} 
+            value={`₹${Math.abs(data.worstDay.saved)}`} 
             icon={TrendingDown} 
-            description={format(new Date(worstDay.date), "dd MMM")}
-            status={worstDay.saved < 0 ? "danger" : "neutral"}
+            description={format(new Date(data.worstDay.date), "dd MMM")}
+            status={data.worstDay.saved < 0 ? "danger" : "neutral"}
           />
         )}
       </div>
@@ -86,7 +132,7 @@ export default async function InsightsPage() {
         <h2 className="text-xl font-medium italic text-foreground uppercase tracking-wider">
           Trends
         </h2>
-        <SavingsChart data={savingsData} />
+        <SavingsChart data={data.savingsData} />
       </div>
     </PageWrapper>
   );
