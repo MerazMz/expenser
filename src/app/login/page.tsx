@@ -39,6 +39,9 @@ export default function LoginPage() {
   const [timer, setTimer] = useState(0);
   const [isWebView, setIsWebView] = useState(false);
 
+  const router = useRouter();
+  const { user: authUser, loading: authLoading } = useAuth();
+
   useEffect(() => {
     const checkWebView = () => {
       if (typeof window === "undefined") return false;
@@ -57,6 +60,21 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedEmail = localStorage.getItem("expenser_email");
+      const savedPass = localStorage.getItem("expenser_pass");
+      if (savedEmail) setEmail(savedEmail);
+      if (savedPass) setPassword(savedPass);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authUser && !authLoading) {
+      router.push("/dashboard");
+    }
+  }, [authUser, authLoading, router]);
+
+  useEffect(() => {
     let interval: NodeJS.Timeout;
     if (timer > 0) {
       interval = setInterval(() => {
@@ -71,15 +89,6 @@ export default function LoginPage() {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
-
-  const router = useRouter();
-  const { user: authUser, loading: authLoading } = useAuth();
-
-  useEffect(() => {
-    if (!authLoading && authUser) {
-      router.push("/dashboard");
-    }
-  }, [authUser, authLoading, router]);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -123,6 +132,10 @@ export default function LoginPage() {
         const res = await login({ email, password });
         if (res.error) toast.error(res.error);
         else {
+          // Save for pre-fill
+          localStorage.setItem("expenser_email", email);
+          localStorage.setItem("expenser_pass", password);
+          
           toast.success("Welcome back!");
           router.push("/dashboard");
         }

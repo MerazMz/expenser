@@ -66,11 +66,28 @@ export function exportToExcel(expenses: ExpenseData[], monthStr: string, monthly
   }
 
   // Create Blob and trigger download
-  const blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Expense-${format(new Date(monthStr + "-01"), 'MMMM-yyyy')}.xlsx`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const buffer = s2ab(wbout);
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const fileName = `Expense-${format(new Date(monthStr + "-01"), 'MMMM-yyyy')}.xlsx`;
+
+  // WebView Detection
+  const isAndroidWebView = typeof navigator !== 'undefined' && navigator.userAgent.includes('EXPENSER_ANDROID_WEBVIEW');
+
+  if (isAndroidWebView && (window as any).Android) {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result;
+      (window as any).Android.downloadBase64File(base64, blob.type, fileName);
+    };
+    reader.readAsDataURL(blob);
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 }
