@@ -10,7 +10,6 @@ import {
   getDay, 
   addMonths, 
   subMonths,
-  isSameDay,
 } from "date-fns";
 import { PageWrapper } from "@/components/layout/page-wrapper";
 import { Button } from "@/components/ui/button";
@@ -62,7 +61,10 @@ export default function CalendarPage() {
   }, [user, monthStr]);
 
   useEffect(() => {
-    loadData();
+    const fetchData = async () => {
+      await loadData();
+    };
+    fetchData();
   }, [loadData]);
 
   const monthStart = startOfMonth(currentDate);
