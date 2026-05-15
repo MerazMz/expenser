@@ -117,9 +117,28 @@ export default function SettingsPage() {
 
   if (authLoading || !settings) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <PageWrapper className="flex flex-col space-y-8 p-6 bg-background min-h-screen">
+        <div className="space-y-3">
+          <div className="h-10 w-48 bg-muted/20 rounded-lg relative overflow-hidden">
+            <div className="absolute inset-0 shimmer" />
+          </div>
+          <div className="h-4 w-32 bg-muted/10 rounded relative overflow-hidden">
+            <div className="absolute inset-0 shimmer" />
+          </div>
+        </div>
+
+        <div className="h-20 w-full bg-card/50 rounded-2xl border border-border relative overflow-hidden">
+          <div className="absolute inset-0 shimmer" />
+        </div>
+
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 w-full bg-card/30 rounded-2xl border border-border/40 relative overflow-hidden">
+              <div className="absolute inset-0 shimmer" />
+            </div>
+          ))}
+        </div>
+      </PageWrapper>
     );
   }
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User, getRedirectResult } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
+import { toast } from "sonner";
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +20,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
+    // Handle redirect result (crucial for WebView flow)
+    const handleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          console.log("Redirect login successful:", result.user.email);
+        }
+      } catch (error: any) {
+        console.error("Redirect Auth Error:", error);
+        if (error.code !== "auth/network-request-failed") {
+          toast.error("Login failed. Please try again.");
+        }
+      }
+    };
+    handleRedirect();
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);

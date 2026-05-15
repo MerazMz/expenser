@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
+import { QueryProvider } from "@/components/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
@@ -35,11 +36,13 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <main className="relative flex min-h-screen flex-col pb-20">
-              {children}
-            </main>
-            <BottomNav />
-            <Toaster position="top-center" expand={false} richColors />
+            <QueryProvider>
+              <main className="relative flex min-h-screen flex-col pb-20">
+                {children}
+              </main>
+              <BottomNav />
+              <Toaster position="top-center" expand={false} richColors />
+            </QueryProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

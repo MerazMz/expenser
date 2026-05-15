@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { auth, googleProvider, signInWithPopup } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { PageWrapper } from "@/components/layout/page-wrapper";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+
+import { handleGoogleLogin } from "@/lib/googleLogin";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -27,8 +29,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      await signInWithPopup(auth, googleProvider);
-      router.push("/dashboard");
+      await handleGoogleLogin();
     } catch (error) {
       console.error("Login failed:", error);
     } finally {

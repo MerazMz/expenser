@@ -16,7 +16,10 @@ interface SpendInputProps {
 
 import { motion, AnimatePresence } from "framer-motion";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 export function SpendInput({ userId, initialSpent = 0, initialNote = "" }: SpendInputProps) {
+  const queryClient = useQueryClient();
   const [spent, setSpent] = useState(initialSpent > 0 ? initialSpent.toString() : "");
   const [note, setNote] = useState(initialNote);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +37,12 @@ export function SpendInput({ userId, initialSpent = 0, initialNote = "" }: Spend
       await saveTodayExpense(userId, Number(spent), note);
       setIsSaved(true);
       toast.success("Expense saved!");
+      
+      // Invalidate cache to refresh data across pages
+      queryClient.invalidateQueries({ queryKey: ["dashboard", userId] });
+      queryClient.invalidateQueries({ queryKey: ["insights", userId] });
+      queryClient.invalidateQueries({ queryKey: ["calendar", userId] });
+
       setTimeout(() => {
         setIsSaved(false);
         setIsEditing(false);

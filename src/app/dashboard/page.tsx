@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { getSettings } from "@/actions/settings";
 import { getTodayExpense, getMonthlySummary, getStreak } from "@/actions/expenses";
 import { TodayCard } from "@/components/dashboard/today-card";
@@ -14,51 +14,41 @@ import { Flame } from "lucide-react";
 
 import { ISettings, IExpense } from "@/types";
 
-interface DashboardData {
-  settings: ISettings;
-  todayExpense: IExpense;
-  summary: {
-    totalSpent: number;
-    totalSaved: number;
-    totalLimit: number;
-    totalLimitTillNow: number;
-  };
-  streak: number;
-  now: Date;
-}
+import { useQuery } from "@tanstack/react-query";
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const { data, isLoading: queryLoading } = useQuery({
+    queryKey: ["dashboard", user?.uid],
+    queryFn: async () => {
+      if (!user) return null;
+      const now = new Date();
+      const currentMonth = format(now, "yyyy-MM");
+      const [settings, todayExpense, summary, streak] = await Promise.all([
+        getSettings(user.uid),
+        getTodayExpense(user.uid),
+        getMonthlySummary(user.uid, currentMonth),
+        getStreak(user.uid)
+      ]);
+
+      if (!settings) {
+        router.push("/onboarding");
+        return null;
+      }
+
+      return { settings, todayExpense, summary, streak, now };
+    },
+    enabled: !!user && !authLoading,
+    staleTime: 1000 * 60 * 5, // 5 minutes fresh
+  });
+
+  const loading = authLoading || queryLoading;
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
-      return;
-    }
-
-    if (user) {
-      const loadData = async () => {
-        const now = new Date();
-        const currentMonth = format(now, "yyyy-MM");
-        const [settings, todayExpense, summary, streak] = await Promise.all([
-          getSettings(user.uid),
-          getTodayExpense(user.uid),
-          getMonthlySummary(user.uid, currentMonth),
-          getStreak(user.uid)
-        ]);
-
-        if (!settings) {
-          router.push("/onboarding");
-          return;
-        }
-
-        setData({ settings, todayExpense, summary, streak, now });
-        setLoading(false);
-      };
-      loadData();
     }
   }, [user, authLoading, router]);
 
@@ -126,11 +116,37 @@ export default function DashboardPage() {
         </h2>
 
         {data.streak >= 0 && (
-          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-black/40 border border-[#c8f135]/20 backdrop-blur-md shadow-[0_0_15px_rgba(200,241,53,0.1)]">
-            <Flame className="h-3.5 w-3.5 text-[#c8f135] fill-[#c8f135]/20" />
-            <span className="text-[10px] font-bold text-foreground tracking-tighter">
-              {data.streak} DAY STREAK
-            </span>
+          <div className="relative group">
+            {/* Background Dull Border */}
+            <div className="absolute -inset-[1.5px] rounded-full border border-[#c8f135]/10" />
+            
+            {/* Glowing Progress Border */}
+            <div 
+              className="absolute -inset-[1.5px] rounded-full opacity-70 group-hover:opacity-100 transition-opacity duration-500"
+              style={{
+                background: `conic-gradient(from 0deg, #c8f135 ${Math.min((data.streak / 30) * 100, 100)}%, transparent ${Math.min((data.streak / 30) * 100, 100)}%)`,
+                filter: 'blur(0.5px)'
+              }}
+            />
+
+            {/* Light Trail (Head) */}
+            <div 
+              className="absolute -inset-[1.5px] rounded-full"
+              style={{
+                transform: `rotate(${Math.min((data.streak / 30) * 360, 360)}deg)`,
+                transition: 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+            >
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 h-1.5 w-1.5 bg-[#c8f135] rounded-full shadow-[0_0_12px_#c8f135,0_0_4px_white]" />
+            </div>
+            <div className="relative flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-black/90 backdrop-blur-xl border border-[#c8f135]/5">
+              <Flame className="h-3.5 w-3.5 text-[#c8f135] fill-[#c8f135]" 
+                style={{ filter: 'drop-shadow(0 0 5px #c8f135)' }}
+              />
+              <span className="text-[10px] font-black text-[#c8f135] tracking-tighter italic uppercase">
+                {data.streak} DAY STREAK
+              </span>
+            </div>
           </div>
         )}
       </div>

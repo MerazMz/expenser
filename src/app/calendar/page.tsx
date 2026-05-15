@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { 
   format, 
   startOfMonth, 
@@ -19,7 +19,7 @@ import { getMonthExpenses, saveExpense, getMonthlySummary } from "@/actions/expe
 import { getSettings } from "@/actions/settings";
 import { MonthlySummary } from "@/components/dashboard/monthly-summary";
 import { cn } from "@/lib/utils";
-import { IExpense, ISettings } from "@/types";
+import { IExpense } from "@/types";
 import {
   Sheet,
   SheetContent,
@@ -27,19 +27,13 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/components/providers/auth-provider";
 
-interface CalendarSummary {
-  totalSpent: number;
-  totalSaved: number;
-  totalLimit: number;
-  totalLimitTillNow: number;
-}
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
 
 export default function CalendarPage() {
   const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [expenses, setExpenses] = useState<IExpense[]>([]);
-  const [summary, setSummary] = useState<CalendarSummary | null>(null);
-  const [settings, setSettings] = useState<ISettings | null>(null);
   const [selectedDay, setSelectedDay] = useState<IExpense | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editSpent, setEditSpent] = useState("");
@@ -47,25 +41,26 @@ export default function CalendarPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const monthStr = format(currentDate, "yyyy-MM");
-  
-  const loadData = useCallback(async () => {
-    if (!user) return;
-    const [expensesData, summaryData, settingsData] = await Promise.all([
-      getMonthExpenses(user.uid, monthStr),
-      getMonthlySummary(user.uid, monthStr),
-      getSettings(user.uid)
-    ]);
-    setExpenses(expensesData);
-    setSummary(summaryData);
-    setSettings(settingsData);
-  }, [user, monthStr]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      await loadData();
-    };
-    fetchData();
-  }, [loadData]);
+  const { data, isLoading: queryLoading } = useQuery({
+    queryKey: ["calendar", user?.uid, monthStr],
+    queryFn: async () => {
+      if (!user) return null;
+      const [expenses, summary, settings] = await Promise.all([
+        getMonthExpenses(user.uid, monthStr),
+        getMonthlySummary(user.uid, monthStr),
+        getSettings(user.uid)
+      ]);
+      return { expenses, summary, settings };
+    },
+    enabled: !!user && !authLoading,
+    staleTime: 1000 * 60 * 10, // 10 mins
+  });
+
+  const loading = authLoading || queryLoading;
+  const expenses = data?.expenses || [];
+  const summary = data?.summary || null;
+  const settings = data?.settings || null;
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -80,7 +75,7 @@ export default function CalendarPage() {
 
   const handleDayClick = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    const expense = expenses.find(e => e.date === dateStr);
+    const expense = expenses.find((e: IExpense) => e.date === dateStr);
     if (expense) {
       setSelectedDay(expense);
       const hasData = expense.spent > 0 || (expense.note && expense.note.trim() !== "");
@@ -97,7 +92,9 @@ export default function CalendarPage() {
       await saveExpense(user.uid, selectedDay.date, Number(editSpent), editNote);
       toast.success("Updated successfully");
       setIsSheetOpen(false);
-      loadData();
+      queryClient.invalidateQueries({ queryKey: ["calendar", user.uid, monthStr] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", user.uid] });
+      queryClient.invalidateQueries({ queryKey: ["insights", user.uid] });
     } catch {
       toast.error("Failed to update");
     } finally {
@@ -105,11 +102,29 @@ export default function CalendarPage() {
     }
   };
 
-  if (authLoading || !summary || !settings) {
+  if (authLoading || loading || !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <PageWrapper className="flex flex-col min-h-screen bg-background px-6 pt-4 pb-24 space-y-8">
+        <div className="flex justify-center">
+          <div className="h-8 w-40 bg-muted/20 rounded-lg relative overflow-hidden">
+            <div className="absolute inset-0 shimmer" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-2">
+          {Array.from({ length: 35 }).map((_, i) => (
+            <div key={i} className="aspect-square w-full bg-card/40 rounded-full border border-border/50 relative overflow-hidden">
+              <div className="absolute inset-0 shimmer" />
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-4">
+          <div className="h-24 w-full bg-card/50 rounded-2xl border border-border relative overflow-hidden">
+            <div className="absolute inset-0 shimmer" />
+          </div>
+        </div>
+      </PageWrapper>
     );
   }
 
@@ -150,7 +165,7 @@ export default function CalendarPage() {
 
         {days.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
-          const expense = expenses.find(e => e.date === dateStr);
+          const expense = expenses.find((e: IExpense) => e.date === dateStr);
           const isTodayDay = isToday(day);
           const isFuture = day > new Date();
 
